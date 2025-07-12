@@ -85,19 +85,43 @@ switch ($requestUri) {
                 $paymentMethod = $_POST['payment_method'];
                 $employeeId = $_SESSION['user_id'];
 
+                // 1. Masukkan ke tabel transactions
                 $stmt = $db->prepare("INSERT INTO transactions (employee_id, final_amount, payment_method) VALUES (?, ?, ?)");
                 $stmt->execute([$employeeId, $totalAmount, $paymentMethod]);
                 $transactionId = $db->lastInsertId();
+                
+                // 2. Siapkan statement untuk mengurangi stok
+                $updateProductStockStmt = $db->prepare("UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?");
+                $updateIngredientStockStmt = $db->prepare("UPDATE ingredients SET stock_quantity = stock_quantity - ? WHERE id = ?");
+                $getRecipeStmt = $db->prepare("SELECT * FROM product_recipes WHERE product_id = ?");
 
-                $stmt = $db->prepare("INSERT INTO transaction_items (transaction_id, product_id, quantity, price_per_item, total_price) VALUES (?, ?, ?, ?, ?)");
+                // 3. Loop melalui item di keranjang
+                $itemStmt = $db->prepare("INSERT INTO transaction_items (transaction_id, product_id, quantity, price_per_item, total_price) VALUES (?, ?, ?, ?, ?)");
                 foreach ($cartData as $productId => $item) {
-                    $stmt->execute([
+                    // Masukkan ke transaction_items
+                    $itemStmt->execute([
                         $transactionId,
                         $productId,
                         $item['quantity'],
                         $item['price'],
                         $item['price'] * $item['quantity']
                     ]);
+                    
+                    // Kurangi Stok
+                    $productInfo = $db->query("SELECT is_recipe FROM products WHERE id = $productId")->fetch();
+
+                    if ($productInfo['is_recipe'] == 1) {
+                        // Jika produk adalah resep, kurangi stok bahan baku
+                        $getRecipeStmt->execute([$productId]);
+                        $recipeItems = $getRecipeStmt->fetchAll();
+                        foreach ($recipeItems as $recipeItem) {
+                            $quantityToReduce = $recipeItem['quantity_used'] * $item['quantity'];
+                            $updateIngredientStockStmt->execute([$quantityToReduce, $recipeItem['ingredient_id']]);
+                        }
+                    } else {
+                        // Jika produk biasa, kurangi stok produk itu sendiri
+                        $updateProductStockStmt->execute([$item['quantity'], $productId]);
+                    }
                 }
                 
                 $db->commit();
@@ -107,7 +131,9 @@ switch ($requestUri) {
 
             } catch (Exception $e) {
                 $db->rollBack();
-                echo "Gagal memproses transaksi: " . $e->getMessage();
+                // Beri pesan error yang lebih informatif
+                error_log("Gagal memproses transaksi: " . $e->getMessage());
+                render_view('error/500', 'app', ['error_message' => $e->getMessage()]);
             }
         }
         break;
@@ -266,6 +292,47 @@ switch ($requestUri) {
         render_view('admin/settings', 'app', [
             'title' => 'Pengaturan',
             'settings' => $settings
+        ]);
+        break;
+        
+    case '/inventory':
+        if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) {
+            http_response_code(403);
+            echo "Akses Ditolak";
+            exit();
+        }
+
+        // Ambil data stok produk
+        $stmtProducts = $db->query(
+            "SELECT id, name, stock_quantity, low_stock_threshold, 'Produk' as type, '' as unit
+             FROM products 
+             ORDER BY name ASC"
+        );
+        $products = $stmtProducts->fetchAll();
+
+        // Ambil data stok bahan baku
+        $stmtIngredients = $db->query(
+            "SELECT id, name, stock_quantity, low_stock_threshold, 'Bahan Baku' as type, unit
+             FROM ingredients 
+             ORDER BY name ASC"
+        );
+        $ingredients = $stmtIngredients->fetchAll();
+
+        // Gabungkan keduanya
+        $inventory = array_merge($products, $ingredients);
+        
+        // Cek low stock alerts
+        $lowStockItems = [];
+        foreach($inventory as $item){
+            if($item['stock_quantity'] <= $item['low_stock_threshold']){
+                $lowStockItems[] = $item;
+            }
+        }
+
+        render_view('admin/inventory', 'app', [
+            'title' => 'Manajemen Inventaris',
+            'inventory' => $inventory,
+            'lowStockItems' => $lowStockItems
         ]);
         break;
 
