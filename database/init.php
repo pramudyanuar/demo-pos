@@ -32,7 +32,7 @@ try {
         name TEXT NOT NULL,
         price REAL NOT NULL,
         cost REAL NOT NULL,
-        image TEXT DEFAULT 'https://via.placeholder.com/150'
+        image TEXT
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -80,11 +80,16 @@ try {
 
     // Masukkan Products
     $products = [
-        ['Kopi Hitam', 12000, 5000], ['Kopi Susu', 15000, 7000], ['Teh Manis', 8000, 3000],
-        ['Croissant', 18000, 9000], ['Roti Bakar', 16000, 8000], ['Air Mineral', 5000, 2000],
-        ['Jus Jeruk', 15000, 7000], ['Nasi Goreng', 25000, 12000]
+        ['Kopi Hitam', 12000, 5000, 'https://picsum.photos/seed/kopi_hitam/150'],
+        ['Kopi Susu', 15000, 7000, 'https://picsum.photos/seed/kopi_susu/150'],
+        ['Teh Manis', 8000, 3000, 'https://picsum.photos/seed/teh_manis/150'],
+        ['Croissant', 18000, 9000, 'https://picsum.photos/seed/croissant/150'],
+        ['Roti Bakar', 16000, 8000, 'https://picsum.photos/seed/roti_bakar/150'],
+        ['Air Mineral', 5000, 2000, 'https://picsum.photos/seed/air_mineral/150'],
+        ['Jus Jeruk', 15000, 7000, 'https://picsum.photos/seed/jus_jeruk/150'],
+        ['Nasi Goreng', 25000, 12000, 'https://picsum.photos/seed/nasi_goreng/150']
     ];
-    $stmt = $db->prepare("INSERT INTO products (name, price, cost) VALUES (?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO products (name, price, cost, image) VALUES (?, ?, ?, ?)");
     foreach ($products as $product) {
         $stmt->execute($product);
     }
