@@ -10,7 +10,7 @@ try {
     $db = new PDO('sqlite:' . $dbFile);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Skema tabel (tanpa data)
+    // Skema tabel
     $schema = <<<SQL
     CREATE TABLE IF NOT EXISTS roles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,9 +38,13 @@ try {
     CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id INTEGER NOT NULL,
+        subtotal REAL NOT NULL,
+        tax_amount REAL DEFAULT 0,
+        discount_amount REAL DEFAULT 0,
         final_amount REAL NOT NULL,
         payment_method TEXT NOT NULL,
-        status TEXT DEFAULT 'Completed',
+        notes TEXT,
+        status TEXT DEFAULT 'Completed', -- Completed, Voided, Refunded
         transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (employee_id) REFERENCES employees(id)
     );
@@ -61,15 +65,13 @@ try {
     $db->exec($schema);
     echo "Struktur tabel berhasil dibuat.\n";
 
-    // --- Gunakan Prepared Statements untuk memasukkan data ---
-
     // Masukkan Roles
     $stmt = $db->prepare("INSERT INTO roles (name) VALUES (?)");
     $stmt->execute(['Manager']);
     $stmt->execute(['Kasir']);
     echo "Data Roles berhasil dimasukkan.\n";
 
-    // Masukkan Employees dengan password yang di-hash secara dinamis
+    // Masukkan Employees
     $adminPassword = password_hash('password123', PASSWORD_DEFAULT);
     $kasirPassword = password_hash('password123', PASSWORD_DEFAULT);
 

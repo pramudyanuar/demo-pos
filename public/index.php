@@ -89,14 +89,58 @@ switch ($requestUri) {
                 
                 $db->commit();
                 
-                // Redirect ke halaman sukses atau kembali ke kasir dengan pesan
-                echo "<script>alert('Transaksi Berhasil!'); window.location.href='/';</script>";
+                // Redirect ke halaman struk
+                header("Location: /receipt?id=" . $transactionId);
+                exit();
 
             } catch (Exception $e) {
                 $db->rollBack();
                 echo "Gagal memproses transaksi: " . $e->getMessage();
             }
         }
+        break;
+
+    case '/receipt':
+        if (!isset($_SESSION['user_id'])) {
+            header('Location: /login');
+            exit();
+        }
+        $transactionId = $_GET['id'] ?? null;
+        if (!$transactionId) {
+            echo "ID Transaksi tidak ditemukan.";
+            exit();
+        }
+
+        // Ambil detail transaksi
+        $stmt = $db->prepare(
+            "SELECT t.*, e.name as employee_name 
+             FROM transactions t
+             JOIN employees e ON t.employee_id = e.id
+             WHERE t.id = ?"
+        );
+        $stmt->execute([$transactionId]);
+        $transaction = $stmt->fetch();
+
+        if (!$transaction) {
+            echo "Transaksi tidak ditemukan.";
+            exit();
+        }
+
+        // Ambil item transaksi
+        $stmt = $db->prepare(
+            "SELECT ti.*, p.name as product_name
+             FROM transaction_items ti
+             JOIN products p ON ti.product_id = p.id
+             WHERE ti.transaction_id = ?"
+        );
+        $stmt->execute([$transactionId]);
+        $items = $stmt->fetchAll();
+
+        render_view('pos/receipt', 'receipt', [
+            'title' => 'Struk Transaksi',
+            'transaction' => $transaction,
+            'items' => $items
+        ]);
         break;
 
     case '/reports':
