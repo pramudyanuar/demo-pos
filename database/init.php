@@ -10,7 +10,7 @@ try {
     $db = new PDO('sqlite:' . $dbFile);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Skema tabel (tanpa data)
+    // Skema tabel
     $schema = <<<SQL
     CREATE TABLE IF NOT EXISTS roles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,13 +55,16 @@ try {
         FOREIGN KEY (transaction_id) REFERENCES transactions(id),
         FOREIGN KEY (product_id) REFERENCES products(id)
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
     SQL;
 
     // Eksekusi pembuatan tabel
     $db->exec($schema);
     echo "Struktur tabel berhasil dibuat.\n";
-
-    // --- Gunakan Prepared Statements untuk memasukkan data ---
 
     // Masukkan Roles
     $stmt = $db->prepare("INSERT INTO roles (name) VALUES (?)");
@@ -69,7 +72,7 @@ try {
     $stmt->execute(['Kasir']);
     echo "Data Roles berhasil dimasukkan.\n";
 
-    // Masukkan Employees dengan password yang di-hash secara dinamis
+    // Masukkan Employees
     $adminPassword = password_hash('password123', PASSWORD_DEFAULT);
     $kasirPassword = password_hash('password123', PASSWORD_DEFAULT);
 
@@ -94,6 +97,13 @@ try {
         $stmt->execute($product);
     }
     echo "Data Products berhasil dimasukkan.\n";
+
+    // Masukkan Settings
+    $stmt = $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
+    $stmt->execute(['tax_rate', '0.11']); // Pajak 11%
+    $stmt->execute(['discount_rate', '0.10']); // Diskon 10%
+    echo "Data Settings berhasil dimasukkan.\n";
+
 
     echo "\nDatabase berhasil dibuat dan diinisialisasi dengan benar.\n";
 

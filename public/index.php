@@ -22,6 +22,16 @@ function render_view($viewName, $layout, $data = []) {
 
 $db = Database::getInstance()->getConnection();
 
+// Fungsi untuk mengambil semua settings
+function get_settings($db) {
+    $settings = [];
+    $stmt = $db->query("SELECT key, value FROM settings");
+    while ($row = $stmt->fetch()) {
+        $settings[$row['key']] = $row['value'];
+    }
+    return $settings;
+}
+
 switch ($requestUri) {
     case '/':
         if (!isset($_SESSION['user_id'])) {
@@ -30,7 +40,12 @@ switch ($requestUri) {
         }
         $stmt = $db->query("SELECT * FROM products ORDER BY name ASC");
         $products = $stmt->fetchAll();
-        render_view('pos/index', 'app', ['title' => 'Kasir', 'products' => $products]);
+        $settings = get_settings($db);
+        render_view('pos/index', 'app', [
+            'title' => 'Kasir', 
+            'products' => $products,
+            'settings' => $settings
+        ]);
         break;
 
     case '/login':
@@ -70,12 +85,10 @@ switch ($requestUri) {
                 $paymentMethod = $_POST['payment_method'];
                 $employeeId = $_SESSION['user_id'];
 
-                // 1. Insert ke tabel transactions
                 $stmt = $db->prepare("INSERT INTO transactions (employee_id, final_amount, payment_method) VALUES (?, ?, ?)");
                 $stmt->execute([$employeeId, $totalAmount, $paymentMethod]);
                 $transactionId = $db->lastInsertId();
 
-                // 2. Insert ke tabel transaction_items
                 $stmt = $db->prepare("INSERT INTO transaction_items (transaction_id, product_id, quantity, price_per_item, total_price) VALUES (?, ?, ?, ?, ?)");
                 foreach ($cartData as $productId => $item) {
                     $stmt->execute([
@@ -89,7 +102,6 @@ switch ($requestUri) {
                 
                 $db->commit();
                 
-                // Redirect ke halaman struk
                 header("Location: /receipt?id=" . $transactionId);
                 exit();
 
@@ -111,7 +123,6 @@ switch ($requestUri) {
             exit();
         }
 
-        // Ambil detail transaksi
         $stmt = $db->prepare(
             "SELECT t.*, e.name as employee_name 
              FROM transactions t
@@ -126,7 +137,6 @@ switch ($requestUri) {
             exit();
         }
 
-        // Ambil item transaksi
         $stmt = $db->prepare(
             "SELECT ti.*, p.name as product_name
              FROM transaction_items ti
@@ -144,7 +154,7 @@ switch ($requestUri) {
         break;
 
     case '/reports':
-         if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) { // Hanya manager
+         if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) {
             http_response_code(403);
             echo "Akses Ditolak";
             exit();
@@ -156,7 +166,7 @@ switch ($requestUri) {
         $startDateQuery = $startDate . ' 00:00:00';
         $endDateQuery = $endDate . ' 23:59:59';
         
-        // Ambil detail transaksi
+        // Ambil detail transaksi (semua status untuk ditampilkan di tabel)
         $stmt = $db->prepare(
             "SELECT t.*, e.name as employee_name 
              FROM transactions t
@@ -167,14 +177,19 @@ switch ($requestUri) {
         $stmt->execute([$startDateQuery, $endDateQuery]);
         $transactions = $stmt->fetchAll();
 
-        // Ambil summary
+        // Ambil summary (hanya dari transaksi yang statusnya 'Completed')
         $stmt = $db->prepare(
             "SELECT 
                 SUM(final_amount) as total_revenue, 
                 COUNT(id) as total_transactions,
-                (SELECT SUM(quantity) FROM transaction_items WHERE transaction_id IN (SELECT id FROM transactions WHERE transaction_date BETWEEN ? AND ?)) as total_items_sold
+                (SELECT SUM(quantity) 
+                 FROM transaction_items 
+                 WHERE transaction_id IN (
+                    SELECT id FROM transactions 
+                    WHERE transaction_date BETWEEN ? AND ? AND status = 'Completed'
+                 )) as total_items_sold
              FROM transactions 
-             WHERE transaction_date BETWEEN ? AND ?"
+             WHERE transaction_date BETWEEN ? AND ? AND status = 'Completed'"
         );
         $stmt->execute([$startDateQuery, $endDateQuery, $startDateQuery, $endDateQuery]);
         $summary = $stmt->fetch();
@@ -185,6 +200,72 @@ switch ($requestUri) {
             'summary' => $summary,
             'startDate' => $startDate,
             'endDate' => $endDate
+        ]);
+        break;
+        
+    case '/reports/transactions':
+        if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) {
+            http_response_code(403);
+            echo "Akses Ditolak";
+            exit();
+        }
+        
+        $stmt = $db->query("SELECT * FROM transactions ORDER BY transaction_date DESC");
+        $transactions = $stmt->fetchAll();
+        
+        render_view('reports/transactions', 'app', [
+            'title' => 'Manajemen Transaksi',
+            'transactions' => $transactions
+        ]);
+        break;
+
+    case '/void-transaction':
+        if ($method === 'POST' && isset($_SESSION['user_id']) && $_SESSION['role_id'] == 1) {
+            $transactionId = $_POST['transaction_id'];
+            $stmt = $db->prepare("UPDATE transactions SET status = 'Voided' WHERE id = ? AND status = 'Completed'");
+            $stmt->execute([$transactionId]);
+            header('Location: /reports/transactions');
+            exit();
+        }
+        http_response_code(403);
+        echo "Akses Ditolak";
+        break;
+
+    case '/refund-transaction':
+        if ($method === 'POST' && isset($_SESSION['user_id']) && $_SESSION['role_id'] == 1) {
+            $transactionId = $_POST['transaction_id'];
+            $stmt = $db->prepare("UPDATE transactions SET status = 'Refunded' WHERE id = ? AND status = 'Completed'");
+            $stmt->execute([$transactionId]);
+            header('Location: /reports/transactions');
+            exit();
+        }
+        http_response_code(403);
+        echo "Akses Ditolak";
+        break;
+        
+    case '/settings':
+        if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) {
+            http_response_code(403);
+            echo "Akses Ditolak";
+            exit();
+        }
+
+        if ($method === 'POST') {
+            $tax_rate = floatval($_POST['tax_rate']) / 100;
+            $discount_rate = floatval($_POST['discount_rate']) / 100;
+
+            $stmt = $db->prepare("UPDATE settings SET value = ? WHERE key = ?");
+            $stmt->execute([$tax_rate, 'tax_rate']);
+            $stmt->execute([$discount_rate, 'discount_rate']);
+
+            header('Location: /settings?success=1');
+            exit();
+        }
+
+        $settings = get_settings($db);
+        render_view('admin/settings', 'app', [
+            'title' => 'Pengaturan',
+            'settings' => $settings
         ]);
         break;
 

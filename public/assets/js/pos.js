@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const productList = document.getElementById("product-list");
   const cartItemsContainer = document.getElementById("cart-items");
   const subtotalEl = document.getElementById("subtotal");
+  const discountEl = document.getElementById("discount");
+  const taxEl = document.getElementById("tax");
   const totalEl = document.getElementById("total");
   const payButton = document.getElementById("btn-pay");
   const paymentModal = document.getElementById("payment-modal");
@@ -11,8 +13,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const paymentForm = document.getElementById("payment-form");
   const cartDataInput = document.getElementById("cart_data_input");
   const totalAmountInput = document.getElementById("total_amount_input");
+  const discountRateText = document.getElementById("discount-rate-text");
+  const taxRateText = document.getElementById("tax-rate-text");
 
   let cart = {}; // { productId: { name, price, quantity } }
+
+  // Ambil tarif dari variabel global 'settings' yang di-render oleh PHP
+  const DISCOUNT_RATE = settings.discount_rate;
+  const TAX_RATE = settings.tax_rate;
+
+  // Set teks persentase, format ke 2 angka di belakang koma jika perlu
+  discountRateText.textContent = (DISCOUNT_RATE * 100)
+    .toFixed(2)
+    .replace(/\.00$/, "");
+  taxRateText.textContent = (TAX_RATE * 100).toFixed(2).replace(/\.00$/, "");
 
   // Menambahkan produk ke keranjang
   productList.addEventListener("click", (e) => {
@@ -31,21 +45,22 @@ document.addEventListener("DOMContentLoaded", () => {
     updateCart();
   });
 
-  // Event listener untuk tombol di dalam keranjang (tambah, kurang, hapus)
+  // Event listener untuk tombol di dalam keranjang
   cartItemsContainer.addEventListener("click", (e) => {
     const target = e.target;
-    const id = target.closest(".cart-item").dataset.id;
+    const cartItem = target.closest(".cart-item");
+    if (!cartItem) return;
 
-    if (target.classList.contains("btn-increase")) {
-      cart[id].quantity++;
-    }
+    const id = cartItem.dataset.id;
+
     if (target.classList.contains("btn-decrease")) {
       cart[id].quantity--;
       if (cart[id].quantity <= 0) {
         delete cart[id];
       }
-    }
-    if (target.classList.contains("btn-remove")) {
+    } else if (target.classList.contains("btn-increase")) {
+      cart[id].quantity++;
+    } else if (target.classList.contains("btn-remove")) {
       delete cart[id];
     }
     updateCart();
@@ -88,22 +103,26 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    const total = subtotal; // Simpan pajak jika ada
+    const discount = subtotal * DISCOUNT_RATE;
+    const taxedAmount = subtotal - discount;
+    const tax = taxedAmount * TAX_RATE;
+    const total = taxedAmount + tax;
+
     subtotalEl.textContent = `Rp ${subtotal.toLocaleString()}`;
+    discountEl.textContent = `- Rp ${discount.toLocaleString()}`;
+    taxEl.textContent = `Rp ${tax.toLocaleString()}`;
     totalEl.textContent = `Rp ${total.toLocaleString()}`;
+
+    totalAmountInput.value = total;
   }
 
   // Modal pembayaran
   payButton.addEventListener("click", () => {
-    const total = Object.values(cart).reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
-    modalTotalEl.textContent = `Rp ${total.toLocaleString()}`;
+    const total = parseFloat(totalAmountInput.value);
+    if (isNaN(total) || total <= 0) return;
 
-    // Populate form inputs
+    modalTotalEl.textContent = `Rp ${total.toLocaleString()}`;
     cartDataInput.value = JSON.stringify(cart);
-    totalAmountInput.value = total;
 
     paymentModal.classList.remove("hidden");
   });
@@ -113,5 +132,6 @@ document.addEventListener("DOMContentLoaded", () => {
     paymentModal.classList.add("hidden");
   });
 
-  // Form submit ditangani oleh browser secara default (action="/process-payment" method="POST")
+  // Panggil updateCart di awal untuk memastikan tampilan sesuai
+  updateCart();
 });

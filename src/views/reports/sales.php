@@ -17,11 +17,11 @@
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-blue-100 p-4 rounded-lg">
-            <h3 class="text-lg font-semibold text-blue-800">Total Pendapatan</h3>
+            <h3 class="text-lg font-semibold text-blue-800">Total Pendapatan (Completed)</h3>
             <p class="text-2xl font-bold text-blue-900">Rp <?= number_format($summary['total_revenue'] ?? 0) ?></p>
         </div>
         <div class="bg-green-100 p-4 rounded-lg">
-            <h3 class="text-lg font-semibold text-green-800">Jumlah Transaksi</h3>
+            <h3 class="text-lg font-semibold text-green-800">Transaksi Berhasil</h3>
             <p class="text-2xl font-bold text-green-900"><?= $summary['total_transactions'] ?? 0 ?></p>
         </div>
         <div class="bg-yellow-100 p-4 rounded-lg">
@@ -41,6 +41,7 @@
                     <th class="py-2 px-4 border-b">Kasir</th>
                     <th class="py-2 px-4 border-b">Total</th>
                     <th class="py-2 px-4 border-b">Metode Bayar</th>
+                    <th class="py-2 px-4 border-b">Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -51,11 +52,20 @@
                     <td class="py-2 px-4 border-b text-center"><?= htmlspecialchars($tx['employee_name']) ?></td>
                     <td class="py-2 px-4 border-b text-right">Rp <?= number_format($tx['final_amount']) ?></td>
                     <td class="py-2 px-4 border-b text-center"><?= htmlspecialchars($tx['payment_method']) ?></td>
+                    <td class="py-2 px-4 border-b text-center">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            <?= $tx['status'] === 'Completed' ? 'bg-green-100 text-green-800' : '' ?>
+                            <?= $tx['status'] === 'Voided' ? 'bg-red-100 text-red-800' : '' ?>
+                            <?= $tx['status'] === 'Refunded' ? 'bg-yellow-100 text-yellow-800' : '' ?>
+                        ">
+                            <?= htmlspecialchars($tx['status']) ?>
+                        </span>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                  <?php if (empty($transactions)): ?>
                     <tr>
-                        <td colspan="5" class="text-center py-4">Tidak ada data untuk periode ini.</td>
+                        <td colspan="6" class="text-center py-4">Tidak ada data untuk periode ini.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>

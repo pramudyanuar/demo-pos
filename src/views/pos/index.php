@@ -25,6 +25,14 @@
                 <span>Subtotal</span>
                 <span id="subtotal">Rp 0</span>
             </div>
+            <div class="flex justify-between text-lg text-green-600">
+                <span>Diskon (<span id="discount-rate-text">0</span>%)</span>
+                <span id="discount">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-lg text-red-600">
+                <span>Pajak (<span id="tax-rate-text">0</span>%)</span>
+                <span id="tax">Rp 0</span>
+            </div>
             <div class="flex justify-between text-lg font-bold mt-2">
                 <span>Total</span>
                 <span id="total">Rp 0</span>
@@ -57,7 +65,7 @@
                 </select>
         </div>
         <div class="items-center px-4 py-3">
-            <button id="confirm-payment-btn" class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+            <button id="confirm-payment-btn" type="submit" form="payment-form" class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
                 Konfirmasi Pembayaran
             </button>
              <button id="cancel-payment-btn" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300">
@@ -68,4 +76,12 @@
     </div>
   </div>
 </div>
+
+<script>
+    // Umpankan settings dari PHP ke JavaScript
+    const settings = {
+        tax_rate: <?= floatval($settings['tax_rate']) ?>,
+        discount_rate: <?= floatval($settings['discount_rate']) ?>
+    };
+</script>
 <script src="/assets/js/pos.js"></script>
