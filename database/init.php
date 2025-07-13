@@ -27,16 +27,17 @@ try {
         FOREIGN KEY (role_id) REFERENCES roles(id)
     );
 
-    -- Modifikasi Tabel Products: Tambah kolom stok dan ambang batas stok rendah
+    -- Modifikasi Tabel Products: Tambah kolom is_active
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         price REAL NOT NULL,
         cost REAL NOT NULL,
-        stock_quantity INTEGER NOT NULL DEFAULT 0, -- Stok saat ini
-        low_stock_threshold INTEGER NOT NULL DEFAULT 10, -- Ambang batas stok rendah
-        is_recipe INTEGER DEFAULT 0, -- Tandai jika produk ini adalah resep (F&B)
-        image TEXT
+        stock_quantity INTEGER NOT NULL DEFAULT 0,
+        low_stock_threshold INTEGER NOT NULL DEFAULT 10,
+        is_recipe INTEGER DEFAULT 0,
+        image TEXT,
+        is_active INTEGER DEFAULT 1 -- 1 untuk aktif (tampil di kasir), 0 untuk nonaktif
     );
 
     -- Tabel Baru: Bahan Baku (untuk resep)
@@ -119,7 +120,7 @@ try {
 
     // Eksekusi pembuatan tabel
     $db->exec($schema);
-    echo "Struktur tabel berhasil dibuat/diperbarui dengan fitur inventaris.\n";
+    echo "Struktur tabel berhasil dibuat/diperbarui dengan kolom is_active.\n";
 
     // Masukkan Roles
     $stmt = $db->prepare("INSERT INTO roles (name) VALUES (?)");
@@ -136,18 +137,18 @@ try {
     $stmt->execute(['Kasir Pagi', 'kasir1', $kasirPassword, 2]);
     echo "Data Employees berhasil dimasukkan.\n";
 
-    // Masukkan Products dengan data stok awal
+    // Masukkan Products dengan data stok awal dan status aktif
     $products = [
-        ['Kopi Hitam', 12000, 5000, 50, 10, 1, 'https://picsum.photos/seed/kopi_hitam/150'], // Produk resep
-        ['Kopi Susu', 15000, 7000, 50, 10, 1, 'https://picsum.photos/seed/kopi_susu/150'], // Produk resep
-        ['Teh Manis', 8000, 3000, 100, 20, 1, 'https://picsum.photos/seed/teh_manis/150'], // Produk resep
-        ['Croissant', 18000, 9000, 80, 15, 0, 'https://picsum.photos/seed/croissant/150'], // Produk non-resep
-        ['Roti Bakar', 16000, 8000, 70, 15, 0, 'https://picsum.photos/seed/roti_bakar/150'], // Produk non-resep
-        ['Air Mineral', 5000, 2000, 200, 50, 0, 'https://picsum.photos/seed/air_mineral/150'], // Produk non-resep
-        ['Jus Jeruk', 15000, 7000, 60, 10, 1, 'https://picsum.photos/seed/jus_jeruk/150'], // Produk resep
-        ['Nasi Goreng', 25000, 12000, 40, 10, 1, 'https://picsum.photos/seed/nasi_goreng/150'] // Produk resep
+        ['Kopi Hitam', 12000, 5000, 50, 10, 1, 'https://picsum.photos/seed/kopi_hitam/150', 1],
+        ['Kopi Susu', 15000, 7000, 50, 10, 1, 'https://picsum.photos/seed/kopi_susu/150', 1],
+        ['Teh Manis', 8000, 3000, 100, 20, 1, 'https://picsum.photos/seed/teh_manis/150', 1],
+        ['Croissant', 18000, 9000, 80, 15, 0, 'https://picsum.photos/seed/croissant/150', 1],
+        ['Roti Bakar', 16000, 8000, 70, 15, 0, 'https://picsum.photos/seed/roti_bakar/150', 1],
+        ['Air Mineral', 5000, 2000, 200, 50, 0, 'https://picsum.photos/seed/air_mineral/150', 1],
+        ['Jus Jeruk', 15000, 7000, 60, 10, 1, 'https://picsum.photos/seed/jus_jeruk/150', 1],
+        ['Nasi Goreng', 25000, 12000, 40, 10, 1, 'https://picsum.photos/seed/nasi_goreng/150', 1]
     ];
-    $stmt = $db->prepare("INSERT INTO products (name, price, cost, stock_quantity, low_stock_threshold, is_recipe, image) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO products (name, price, cost, stock_quantity, low_stock_threshold, is_recipe, image, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     foreach ($products as $product) {
         $stmt->execute($product);
     }
@@ -168,19 +169,15 @@ try {
     echo "Data Ingredients berhasil dimasukkan.\n";
 
     // Definisikan Resep
-    // Kopi Hitam (ID 1) = 10gr Biji Kopi (ID 1) + 15gr Gula (ID 3)
     $db->exec("INSERT INTO product_recipes (product_id, ingredient_id, quantity_used) VALUES (1, 1, 10), (1, 3, 15)");
-    // Kopi Susu (ID 2) = 10gr Biji Kopi (ID 1) + 100ml Susu (ID 2) + 15gr Gula (ID 3)
     $db->exec("INSERT INTO product_recipes (product_id, ingredient_id, quantity_used) VALUES (2, 1, 10), (2, 2, 100), (2, 3, 15)");
     echo "Data Resep berhasil dimasukkan.\n";
 
-
     // Masukkan Settings
     $stmt = $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
-    $stmt->execute(['tax_rate', '0.11']); // Pajak 11%
-    $stmt->execute(['discount_rate', '0.10']); // Diskon 10%
+    $stmt->execute(['tax_rate', '0.11']);
+    $stmt->execute(['discount_rate', '0.10']);
     echo "Data Settings berhasil dimasukkan.\n";
-
 
     echo "\nDatabase berhasil dibuat dan diinisialisasi dengan benar.\n";
 
